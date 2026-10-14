@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RemapAKey.Core/RemapAKey.Core.csproj" />
+    <Project Path="src/RemapAKey/RemapAKey.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RemapAKey.Core.Tests/RemapAKey.Core.Tests.csproj" />
+  </Folder>
+</Solution>
