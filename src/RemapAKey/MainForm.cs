@@ -24,6 +24,9 @@ internal sealed class MainForm : Form
     private readonly Label _warning = new() { AutoSize = true, MaximumSize = new Size(520, 0), ForeColor = Color.Firebrick };
     private readonly FlowLayoutPanel _systemPanel = new() { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
     private readonly Label _systemStatus = new() { AutoSize = true, MaximumSize = new Size(520, 0) };
+    private readonly CheckBox _checkForUpdates = new() { Text = "Check for updates automatically", AutoSize = true };
+    private readonly FlowLayoutPanel _updateBanner = new() { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
+    private readonly Label _updateText = new() { AutoSize = true, MaximumSize = new Size(520, 0), Anchor = AnchorStyles.Left };
     private bool _refreshing;
 
     public MainForm(AppController app, Icon icon)
@@ -33,8 +36,8 @@ internal sealed class MainForm : Form
         Text = "Remap a Key";
         Icon = icon;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(560, 560);
-        MinimumSize = new Size(480, 480);
+        ClientSize = new Size(560, 620);
+        MinimumSize = new Size(480, 540);
         StartPosition = FormStartPosition.CenterScreen;
 
         _list.Columns.Add("When I press", 220);
@@ -65,6 +68,19 @@ internal sealed class MainForm : Form
         _systemPanel.Controls.AddRange([_systemStatus, apply, removeSystem]);
         _systemPanel.SetFlowBreak(_systemStatus, true);
 
+        var installUpdate = new Button { Text = "Update now…", AutoSize = true };
+        installUpdate.Click += (_, _) => UpdateUi.Offer(_app, this);
+        _updateBanner.Controls.AddRange([_updateText, installUpdate]);
+
+        var checkNow = new Button { Text = "Check for updates", AutoSize = true };
+        checkNow.Click += (_, _) => UpdateUi.CheckNow(_app, this);
+        var updates = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
+        updates.Controls.AddRange([
+            new Label { Text = $"Version {Updater.CurrentVersion.ToString(3)}", AutoSize = true, Anchor = AnchorStyles.Left, ForeColor = SystemColors.GrayText },
+            checkNow,
+            _checkForUpdates,
+        ]);
+
         var hint = new Label
         {
             Text = "Closing this window keeps Remap a Key running in the tray. Use the tray icon to exit.",
@@ -75,6 +91,7 @@ internal sealed class MainForm : Form
 
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), ColumnCount = 1 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.Controls.Add(_updateBanner);
         layout.Controls.Add(new Label { Text = "Remap method", AutoSize = true });
         layout.Controls.Add(_mode);
         layout.Controls.Add(_modeHelp);
@@ -84,6 +101,7 @@ internal sealed class MainForm : Form
         layout.Controls.Add(buttons);
         layout.Controls.Add(_systemPanel);
         layout.Controls.Add(_startWithWindows);
+        layout.Controls.Add(updates);
         layout.Controls.Add(hint);
         // The list is the one row that should soak up spare height.
         for (var row = 0; row < layout.Controls.Count; row++)
@@ -98,6 +116,7 @@ internal sealed class MainForm : Form
         };
         _enabled.CheckedChanged += (_, _) => { if (!_refreshing) _app.Enabled = _enabled.Checked; };
         _startWithWindows.CheckedChanged += (_, _) => { if (!_refreshing) _app.StartWithWindows = _startWithWindows.Checked; };
+        _checkForUpdates.CheckedChanged += (_, _) => { if (!_refreshing) _app.CheckForUpdates = _checkForUpdates.Checked; };
         _list.SelectedIndexChanged += (_, _) => _remove.Enabled = _list.SelectedItems.Count > 0;
         _list.KeyDown += (_, e) => { if (e.KeyCode == Keys.Delete) RemoveSelected(); };
 
@@ -113,6 +132,10 @@ internal sealed class MainForm : Form
         _mode.SelectedIndex = system ? 1 : 0;
         _enabled.Checked = _app.Enabled;
         _startWithWindows.Checked = _app.StartWithWindows;
+        _checkForUpdates.Checked = _app.CheckForUpdates;
+
+        _updateBanner.Visible = _app.AvailableUpdate is not null;
+        _updateText.Text = $"Version {_app.AvailableUpdate?.Version.ToString(3)} is available.";
 
         _modeHelp.Text = system
             ? "Windows itself swaps the keys, before any program sees them, so it works everywhere (Raycast, games, " +

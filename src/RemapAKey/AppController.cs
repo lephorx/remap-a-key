@@ -14,12 +14,39 @@ internal sealed class AppController : IDisposable
     /// <summary>Raised after any change, so the window and tray menu can refresh.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised when an automatic check finds a release it hasn't told the user about yet.</summary>
+    public event Action<ReleaseInfo>? UpdateFound;
+
+    /// <summary>Raised when the app should quit (e.g. after installing an update that has already been started).</summary>
+    public event Action? ExitRequested;
+
+    private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(6);
+
+    private readonly System.Windows.Forms.Timer _updateTimer = new();
+    private bool _checking;
+    private Version? _announced;
+
+    /// <summary>A newer release than the one running, if a check has found one.</summary>
+    public ReleaseInfo? AvailableUpdate { get; private set; }
+
     public AppController()
     {
         Config = RemapConfig.Load(_configPath);
         Hook = new KeyboardHook(_engine);
         Hook.Install();
         Sync();
+
+        if (Updater.CanSelfUpdate)
+        {
+            _updateTimer.Interval = (int)FirstCheckDelay.TotalMilliseconds;
+            _updateTimer.Tick += async (_, _) =>
+            {
+                _updateTimer.Interval = (int)CheckInterval.TotalMilliseconds;
+                if (Config.CheckForUpdates) await CheckForUpdatesAsync(announce: true);
+            };
+            _updateTimer.Start();
+        }
     }
 
     public RemapMode Mode
@@ -55,6 +82,48 @@ internal sealed class AppController : IDisposable
             Commit();
         }
     }
+
+    public bool CheckForUpdates
+    {
+        get => Config.CheckForUpdates;
+        set
+        {
+            Config.CheckForUpdates = value;
+            Commit();
+        }
+    }
+
+    /// <summary>Asks GitHub for the newest release. Null if the check failed or another one is already running.</summary>
+    public async Task<UpdateCheck?> CheckForUpdatesAsync(bool announce = false)
+    {
+        if (_checking) return null;
+        _checking = true;
+        try
+        {
+            AvailableUpdate = await Updater.CheckAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidDataException)
+        {
+            return UpdateCheck.Failed;
+        }
+        finally
+        {
+            _checking = false;
+        }
+
+        Changed?.Invoke();
+
+        if (AvailableUpdate is null) return UpdateCheck.UpToDate;
+        if (announce && _announced != AvailableUpdate.Version)
+        {
+            _announced = AvailableUpdate.Version;
+            UpdateFound?.Invoke(AvailableUpdate);
+        }
+
+        return UpdateCheck.Available;
+    }
+
+    public void RequestExit() => ExitRequested?.Invoke();
 
     public void AddMappings(IEnumerable<KeyMapping> mappings)
     {
@@ -119,5 +188,16 @@ internal sealed class AppController : IDisposable
         return def;
     }
 
-    public void Dispose() => Hook.Dispose();
+    public void Dispose()
+    {
+        _updateTimer.Dispose();
+        Hook.Dispose();
+    }
+}
+
+internal enum UpdateCheck
+{
+    UpToDate,
+    Available,
+    Failed,
 }

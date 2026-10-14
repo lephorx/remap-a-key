@@ -20,6 +20,7 @@ public sealed class RemapConfig
 
     public bool Enabled { get; set; } = true;
     public bool StartWithWindows { get; set; }
+    public bool CheckForUpdates { get; set; } = true;
     public List<KeyMapping> Mappings { get; set; } = [];
 
     public static string DefaultPath { get; } = Path.Combine(

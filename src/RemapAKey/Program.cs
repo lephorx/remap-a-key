@@ -9,6 +9,8 @@ internal static class Program
         if (SystemKeyMap.IsElevatedCommand(args))
             return SystemKeyMap.RunElevatedCommand(args);
 
+        Updater.WaitForPredecessor(args);
+
         using var singleInstance = new Mutex(initiallyOwned: true, "RemapAKey.SingleInstance", out var isFirst);
         if (!isFirst)
         {
@@ -17,6 +19,7 @@ internal static class Program
             return 0;
         }
 
+        Updater.CleanUpLeftovers();
         ApplicationConfiguration.Initialize();
 
         AppController app;
@@ -31,7 +34,7 @@ internal static class Program
         }
 
         var startHidden = args.Contains(AutoStart.MinimizedArg);
-        Application.Run(new TrayApplicationContext(app, startHidden));
+        Application.Run(new TrayApplicationContext(app, startHidden, Updater.WasJustUpdated(args)));
         return 0;
     }
 }
