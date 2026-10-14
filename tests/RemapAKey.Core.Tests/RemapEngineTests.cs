@@ -183,3 +183,85 @@ public class RemapConfigTests
         Assert.Equal("Esc", config.Mappings[0].To);
     }
 }
+
+public class ScancodeMapTests
+{
+    private static byte[] BuildOrFail(params (string From, string? To)[] mappings) =>
+        ScancodeMap.Build(mappings.Select(m => new KeyMapping(m.From, m.To)), out _)!;
+
+    [Fact]
+    public void SwapCtrlAndWinMatchesKnownRegistryValue()
+    {
+        // Left Ctrl (1D) <-> Left Win (E0 5B): 2 entries + terminator = 3 DWORDs.
+        var data = BuildOrFail(("Left Ctrl", "Left Win"), ("Left Win", "Left Ctrl"));
+
+        Assert.Equal(
+            "0000000000000000" + "03000000" + "5BE01D00" + "1D005BE0" + "00000000",
+            ScancodeMap.ToHex(data));
+    }
+
+    [Fact]
+    public void DisabledKeyProducesZeroScancode()
+    {
+        // Caps Lock (3A) -> nothing.
+        Assert.Equal("0000000000000000" + "02000000" + "00003A00" + "00000000",
+            ScancodeMap.ToHex(BuildOrFail(("Caps Lock", null))));
+    }
+
+    [Fact]
+    public void BuiltMapsAreValidAndEmptyOrUnsupportedGivesNull()
+    {
+        Assert.True(ScancodeMap.IsValid(BuildOrFail(("Caps Lock", "Left Ctrl"))));
+
+        Assert.Null(ScancodeMap.Build([], out _));
+        Assert.Null(ScancodeMap.Build([new("A", "A")], out _));
+
+        var map = ScancodeMap.Build([new("Pause", "A"), new("Caps Lock", "Esc")], out var skipped);
+        Assert.NotNull(map);
+        Assert.Equal([new KeyMapping("Pause", "A")], skipped);
+    }
+
+    [Fact]
+    public void MalformedMapsAreRejected()
+    {
+        var good = BuildOrFail(("Caps Lock", "Left Ctrl"));
+
+        Assert.False(ScancodeMap.IsValid([]));
+        Assert.False(ScancodeMap.IsValid(good[..^1]));                // truncated
+        Assert.False(ScancodeMap.IsValid([.. good, 0, 0, 0, 0]));     // trailing junk
+        var badHeader = (byte[])good.Clone();
+        badHeader[0] = 1;
+        Assert.False(ScancodeMap.IsValid(badHeader));
+    }
+
+    [Fact]
+    public void HexRoundTripsAndRejectsGarbage()
+    {
+        var data = BuildOrFail(("Caps Lock", "Left Ctrl"));
+
+        Assert.Equal(data, ScancodeMap.FromHex(ScancodeMap.ToHex(data)));
+        Assert.Null(ScancodeMap.FromHex("not hex"));
+    }
+
+    [Fact]
+    public void EveryCatalogScancodeIsUniqueOrUnsupported()
+    {
+        var scans = KeyCatalog.All.Where(k => k.Scan != 0).Select(k => k.Scan).ToList();
+        Assert.Equal(scans.Count, scans.Distinct().Count());
+    }
+}
+
+public class ScancodeMapParseTests
+{
+    [Fact]
+    public void ParseReadsBackWhatBuildWrote()
+    {
+        var data = ScancodeMap.Build([new("Left Ctrl", "Left Win"), new("Caps Lock", null)], out _)!;
+
+        Assert.True(ScancodeMap.TryParse(data, out var entries));
+        Assert.Equal(0xE05B, entries[0x1D]);
+        Assert.Equal(0, entries[0x3A]);
+        Assert.Equal(2, entries.Count);
+        Assert.False(ScancodeMap.TryParse([1, 2, 3], out _));
+    }
+}

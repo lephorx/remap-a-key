@@ -8,14 +8,16 @@ internal sealed class KeyPicker : UserControl
     public const string DisabledLabel = "(nothing – disable the key)";
 
     private readonly KeyboardHook _hook;
+    private readonly Func<KeyStroke, KeyDef?> _resolve;
     private readonly ComboBox _combo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     private readonly Button _capture = new() { Text = "Press a key…", AutoSize = true, Dock = DockStyle.Fill };
 
     public event EventHandler? SelectionChanged;
 
-    public KeyPicker(KeyboardHook hook, bool allowDisabled)
+    public KeyPicker(KeyboardHook hook, Func<KeyStroke, KeyDef?> resolve, bool allowDisabled)
     {
         _hook = hook;
+        _resolve = resolve;
 
         if (allowDisabled) _combo.Items.Add(DisabledLabel);
         _combo.Items.AddRange(KeyCatalog.All.Select(k => k.Name).Cast<object>().ToArray());
@@ -61,7 +63,7 @@ internal sealed class KeyPicker : UserControl
             {
                 Reset();
 
-                var def = KeyCatalog.Find(stroke);
+                var def = _resolve(stroke);
                 if (def is null)
                     MessageBox.Show(this, "That key can't be remapped. Pick one from the list instead.",
                         "Unsupported key", MessageBoxButtons.OK, MessageBoxIcon.Information);

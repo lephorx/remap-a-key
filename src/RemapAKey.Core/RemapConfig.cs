@@ -1,10 +1,22 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RemapAKey.Core;
+
+public enum RemapMode
+{
+    /// <summary>Software remapping while the app runs: instant, no admin, but some programs ignore the result.</summary>
+    Live,
+    /// <summary>Windows' own Scancode Map: works everywhere, needs admin and a restart.</summary>
+    System,
+}
 
 public sealed class RemapConfig
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public RemapMode Mode { get; set; } = RemapMode.Live;
 
     public bool Enabled { get; set; } = true;
     public bool StartWithWindows { get; set; }

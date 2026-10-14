@@ -9,7 +9,7 @@ internal sealed class AddMappingDialog : Form
     private readonly CheckBox _swap = new() { Text = "Also do the reverse (swap the two keys)", AutoSize = true, Checked = true };
     private readonly Button _ok = new() { Text = "Add", DialogResult = DialogResult.OK, Enabled = false, AutoSize = true };
 
-    public AddMappingDialog(KeyboardHook hook)
+    public AddMappingDialog(AppController app)
     {
         Text = "Add a key remap";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -18,8 +18,8 @@ internal sealed class AddMappingDialog : Form
         AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(520, 250);
 
-        _from = new KeyPicker(hook, allowDisabled: false);
-        _to = new KeyPicker(hook, allowDisabled: true);
+        _from = new KeyPicker(app.Hook, app.ResolveCaptured, allowDisabled: false);
+        _to = new KeyPicker(app.Hook, app.ResolveCaptured, allowDisabled: true);
         _from.SelectionChanged += (_, _) => UpdateState();
         _to.SelectionChanged += (_, _) => UpdateState();
         _swap.CheckedChanged += (_, _) => UpdateState();

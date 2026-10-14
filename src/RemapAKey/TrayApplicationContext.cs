@@ -1,3 +1,5 @@
+using RemapAKey.Core;
+
 namespace RemapAKey;
 
 internal sealed class TrayApplicationContext : ApplicationContext
@@ -34,9 +36,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void UpdateTray()
     {
+        var system = _app.Mode == RemapMode.System;
         _enabledItem.Checked = _app.Enabled;
-        _tray.Icon = _app.Enabled ? _activeIcon : _pausedIcon;
-        _tray.Text = _app.Enabled ? "Remap a Key – active" : "Remap a Key – paused";
+        _enabledItem.Enabled = !system; // in system-wide mode Windows does the remapping, so there's nothing to pause
+        _tray.Icon = system || _app.Enabled ? _activeIcon : _pausedIcon;
+        _tray.Text = system ? "Remap a Key – system-wide mode"
+            : _app.Enabled ? "Remap a Key – active" : "Remap a Key – paused";
     }
 
     private void ShowWindow()
