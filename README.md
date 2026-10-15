@@ -69,5 +69,3 @@ The updater compares the release tag with the version baked into the exe, so a m
 
 - `src/RemapAKey.Core`: the platform-independent part: key catalog, `RemapEngine` (decides pass / block / replace for each key event), `ScancodeMap` (builds the registry value for system-wide mode), config and presets. Unit tested.
 - `src/RemapAKey`: the Windows part: a `WH_KEYBOARD_LL` hook feeds each keystroke to the engine, and replacements are sent with `SendInput` (tagged so the hook ignores its own output). `UpdateInstaller` (Core, tested) does the verified download and file swap for self-updates; `Updater` and `UpdateUi` do the GitHub check and the dialogs. System-wide mode writes the Scancode Map through a short UAC-elevated re-launch of the same exe. WinForms UI plus tray icon.
-
-Created in [T3 Code](https://t3.codes).
